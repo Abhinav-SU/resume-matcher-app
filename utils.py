@@ -1,15 +1,14 @@
 from docx import Document
-import tempfile
 import fitz  # PyMuPDF
 from logger import logger
 import io
 
 def extract_text_from_pdf(file_bytes):
     try:
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        text = ""
-        for page in doc:
-            text += page.get_text()
+        with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+            text = ""
+            for page in doc:
+                text += page.get_text()
         logger.info("PDF text extraction successful (%d bytes)", len(file_bytes))
         return text
     except Exception as e:

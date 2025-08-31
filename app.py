@@ -5,11 +5,12 @@ Streamlit Resume Matcher Application
 import streamlit as st
 from matcher import rank_resumes
 from utils import extract_text
-from gemini_api import generate_fit_summary
+from gemini_api import generate_fit_summary, MissingAPIKeyError
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from logger import logger
 import time
+import os
 
 st.set_page_config(layout="wide")
 st.title("🔍 Candidate Recommendation Engine")
@@ -36,17 +37,21 @@ if "selected" not in st.session_state:
 
         def parse_resume(file):
             start = time.time()
-            name = file.name
+            filename = file.name
+            display_name = os.path.splitext(filename)[0]
             file_bytes = file.read()
             file.seek(0)  # Reset pointer for future use
-            text = extract_text(file_bytes, name)
-            logger.info("Parsed %s in %.2fs (%d bytes)", name, time.time() - start, len(file_bytes))
-            return name, text, file_bytes, name
+            text = extract_text(file_bytes, filename)
+            logger.info("Parsed %s in %.2fs (%d bytes)", filename, time.time() - start, len(file_bytes))
+            return display_name, text, file_bytes, filename
 
         with ThreadPoolExecutor() as executor:
             results = list(executor.map(parse_resume, resumes))
-
-        names, texts, file_bytes, filenames = zip(*[r for r in results if r[1].strip()])
+        parsed = [r for r in results if r[1].strip()]
+        if not parsed:
+            st.error("No readable text found in uploaded resumes.")
+            st.stop()
+        names, texts, file_bytes, filenames = zip(*parsed)
         
         logger.info("Ranking candidates now")
         st.session_state.results = rank_resumes(job_desc, texts, names, file_bytes, filenames)
@@ -84,7 +89,11 @@ else:
         # Lazy load summary only when viewing profile
         if "summary" not in candidate:
             with st.spinner("Generating AI summary..."):
-                summary = generate_fit_summary(st.session_state.job_desc, candidate["resume_text"])
+                try:
+                    summary = generate_fit_summary(st.session_state.job_desc, candidate["resume_text"])
+                except MissingAPIKeyError:
+                    st.error("GEMINI_API_KEY not configured. Unable to generate summary.")
+                    summary = "_GEMINI_API_KEY not configured._"
                 candidate["summary"] = summary
                 logger.info("Generated summary on-demand for: %s", candidate["name"])
         else:
