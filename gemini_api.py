@@ -9,17 +9,26 @@ import time
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(env_path)
 
-# Get API key with error handling
+# Get API key and configure Gemini if available
 API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found. Please set it in .env file.")
+if API_KEY:
+    genai.configure(api_key=API_KEY)
+else:
+    logger.error("GEMINI_API_KEY not found. Some features will be disabled.")
 
-# Configure Gemini
-genai.configure(api_key=API_KEY)
+
+class MissingAPIKeyError(Exception):
+    """Raised when GEMINI_API_KEY is not configured."""
+
+
+def _ensure_api_key():
+    if not API_KEY:
+        raise MissingAPIKeyError("GEMINI_API_KEY not configured")
 
 def get_embedding(text):
     """Generate embeddings using Gemini API."""
     try:
+        _ensure_api_key()
         start = time.time()
         # Clean and prepare text
         text = text.strip()
@@ -46,6 +55,9 @@ def get_embedding(text):
         logger.info("Gemini embedding success (%.2fs, %d chars)", time.time() - start, len(text))
         return embedding
 
+    except MissingAPIKeyError:
+        logger.error("Embedding skipped: GEMINI_API_KEY not configured")
+        return np.zeros(768)
     except Exception as e:
         logger.error("Embedding error: %s", str(e))
         return np.zeros(768)
@@ -65,12 +77,16 @@ Explain briefly why this candidate is a good match for this job.
 """
 
     try:
+        _ensure_api_key()
         start = time.time()
         model = genai.GenerativeModel('models/gemini-1.5-flash')
         response = model.generate_content(prompt)
         summary = response.text.strip()
         logger.info("Gemini summary success (%.2fs)", time.time() - start)
         return summary
+    except MissingAPIKeyError:
+        logger.error("Summary generation skipped: GEMINI_API_KEY not configured")
+        raise
     except Exception as e:
         logger.error("Summary generation failed: %s", str(e))
         return "_Could not generate summary._"
