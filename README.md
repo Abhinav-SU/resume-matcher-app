@@ -154,12 +154,16 @@ resume-matcher-app/
    - Check file size (should be < 10MB)
    - Ensure proper file permissions
 
-3. **Slow performance**
+3. **"No readable text found in uploaded resumes"**
+   - Occurs when text parsing returns empty results (e.g., scanned images or corrupted files)
+   - Verify file integrity or upload text-based PDF/DOCX files
+
+4. **Slow performance**
    - Check internet connection (for Gemini API calls)
    - Reduce number of simultaneous uploads
    - Monitor logs for specific bottlenecks
 
-4. **Import errors**
+5. **Import errors**
    - Verify all dependencies are installed: `pip install -r requirements.txt`
    - Check Python version compatibility (3.8+)
 
